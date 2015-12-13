@@ -228,7 +228,7 @@ function find(connectionName, collectionName, criteria, cb, round) {
   // If you need to access your private data for this collection:
   var db = registry.db(collectionName);
 
-  console.log('GETTING DB FOR "%s"."%s"', connectionName, collectionName);
+  //console.log('GETTING DB FOR "%s"."%s"', connectionName, collectionName);
   // console.log('got: ',db);
   if (!db) {
     return cb((function buildError(){
