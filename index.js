@@ -8,6 +8,7 @@ var extend    = require('xtend');
 var cookie    = require('cookie');
 var DeepMerge = require('deep-merge');
 var _         = require('underscore');
+var _runJoins = require('waterline-cursor');
 
 var merge = DeepMerge(function(a, b) {
   return b;
@@ -550,7 +551,64 @@ adapter.merge = function adapterMerge(connectionName, collectionName, id, attrs,
 
 };
 
+  /**
+     * Join
+     *
+     * Peforms a join between 2-3 couch collections when Waterline core
+     * needs to satisfy a `.populate()`.
+     * 
+     * Adapted from sails-mongo adapter
+     * 
+     * @param  {[type]}   connectionName [description]
+     * @param  {[type]}   collectionName [description]
+     * @param  {[type]}   criteria       [description]
+     * @param  {Function} cb             [description]
+     * @return {[type]}                  [description]
+     */
+    adapter.join = function (connectionName, collectionName, criteria, cb) {
 
+      // Ignore `select` from waterline core
+      if (typeof criteria === 'object') {
+        delete criteria.select;
+      }
+
+      var collection = registry.collection(collectionName);
+
+      // Populate associated records for each parent result
+      // (or do them all at once as an optimization, if possible)
+      _runJoins({
+
+        instructions: criteria,
+        parentCollection: collectionName,
+
+        /**
+         * Find some records directly (using only this adapter)
+         * from the specified collection.
+         *
+         * @param  {String}   collectionIdentity
+         * @param  {Object}   criteria
+         * @param  {Function} cb
+         */
+        $find: function (collectionIdentity, criteria, cb) {
+          var collection = registry.collection(collectionIdentity);
+          return collection.find(criteria, cb);
+        },
+
+        /**
+         * Look up the name of the primary key field
+         * for the collection with the specified identity.
+         *
+         * @param  {String}   collectionIdentity
+         * @return {String}
+         */
+        $getPK: function (collectionIdentity) {
+          if (!collectionIdentity) 
+              return;
+          return "id";
+        }
+      }, cb);
+
+    },
 
 /// View
 
