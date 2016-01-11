@@ -2,20 +2,20 @@
  * Module dependencies
  */
 
-var nano      = require('nano');
-var async     = require('async');
-var extend    = require('xtend');
-var cookie    = require('cookie');
+var nano = require('nano');
+var async = require('async');
+var extend = require('xtend');
+var cookie = require('cookie');
 var DeepMerge = require('deep-merge');
-var _         = require('underscore');
+var _ = require('underscore');
 var _runJoins = require('waterline-cursor');
 
-var merge = DeepMerge(function(a, b) {
-  return b;
+var merge = DeepMerge(function (a, b) {
+    return b;
 });
 
 var registry = require('./registry');
-var views    = require('./views');
+var views = require('./views');
 
 
 
@@ -41,35 +41,29 @@ adapter.reservedAttributes = ['id', 'rev'];
 // Default configuration for collections
 // (same effect as if these properties were included at the top level of the model definitions)
 adapter.defaults = {
-
-  port: 5984,
-  host: 'localhost',
-  https: false,
-  username: null,
-  password: null,
-
-  schema: true,
-  syncable: false,
-  autoPK: false,
-  pkFormat: 'string',
-
-  maxMergeAttempts: 5,
-
-
-
-  // If setting syncable, you should consider the migrate option,
-  // which allows you to set how the sync will be performed.
-  // It can be overridden globally in an app (config/adapters.js)
-  // and on a per-model basis.
-  //
-  // IMPORTANT:
-  // `migrate` is not a production data migration solution!
-  // In production, always use `migrate: safe`
-  //
-  // drop   => Drop schema and data, then recreate it
-  // alter  => Drop/add columns as necessary.
-  // safe   => Don't change anything (good for production DBs)
-  migrate: 'safe'
+    port: 5984,
+    host: 'localhost',
+    https: false,
+    username: null,
+    password: null,
+    schema: true,
+    syncable: false,
+    autoPK: false,
+    pkFormat: 'string',
+    maxMergeAttempts: 5,
+    // If setting syncable, you should consider the migrate option,
+    // which allows you to set how the sync will be performed.
+    // It can be overridden globally in an app (config/adapters.js)
+    // and on a per-model basis.
+    //
+    // IMPORTANT:
+    // `migrate` is not a production data migration solution!
+    // In production, always use `migrate: safe`
+    //
+    // drop   => Drop schema and data, then recreate it
+    // alter  => Drop/add columns as necessary.
+    // safe   => Don't change anything (good for production DBs)
+    migrate: 'safe'
 };
 
 /**
@@ -83,21 +77,21 @@ adapter.defaults = {
  */
 adapter.registerConnection = function registerConnection(connection, collections, cb) {
 
-  var url = urlForConfig(connection);
-  var db = nano(url);
+    var url = urlForConfig(connection);
+    var db = nano(url);
 
-  // Save the connection
-  registry.connection(connection.identity, connection);
+    // Save the connection
+    registry.connection(connection.identity, connection);
 
-  async.each(_.keys(collections),function(modelIdentity,next) {
-    adapter.registerSingleCollection(connection, modelIdentity, collections[modelIdentity], next);
-  }, function afterAsyncEach (err) {
-    if(err) {
-      return cb(new Error(err.description));
-    }
+    async.each(_.keys(collections), function (modelIdentity, next) {
+        adapter.registerSingleCollection(connection, modelIdentity, collections[modelIdentity], next);
+    }, function afterAsyncEach(err) {
+        if (err) {
+            return cb(new Error(err.description));
+        }
 
-    return cb();
-  });
+        return cb();
+    });
 };
 
 /**
@@ -110,44 +104,45 @@ adapter.registerConnection = function registerConnection(connection, collections
  * @return {[type]}              [description]
  */
 adapter.registerSingleCollection = function registerCollection(connection, collectionName, collection, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
+    collectionName = sanitizeCollectionName(collectionName);
 
-  var url = urlForConfig(connection);
+    var url = urlForConfig(connection);
 
-  // Wire up nano to the configured couchdb connection
-  var db = nano(url);
+    // Wire up nano to the configured couchdb connection
+    var db = nano(url);
 
-  // console.log('registering %s', collectionName);
-  // console.log('got db.db or whatever', db);
-  // console.log('urlForConfig', url,connection);
+    // console.log('registering %s', collectionName);
+    // console.log('got db.db or whatever', db);
+    // console.log('urlForConfig', url,connection);
 
-  db.db.get(collectionName, function gotDatabase(err) {
+    db.db.get(collectionName, function gotDatabase(err) {
 
-    // No error means we're good!  The collection (or in couch terms, the "db")
-    // is already known and ready to use.
-    if (!err) {
-      registry.collection(collectionName, collection);
-      registry.db(collectionName, nano(url + collectionName));
-      return cb();
-    }
+        // No error means we're good!  The collection (or in couch terms, the "db")
+        // is already known and ready to use.
+        if (!err) {
+            registry.collection(collectionName, collection);
+            registry.db(collectionName, nano(url + collectionName));
+            return cb();
+        }
 
-    try {
-      if (err.status_code == 404 && err.reason == 'no_db_file') {
-        db.db.create(collectionName, function createdDB(err) {
-          if (err) {
+        try {
+            if (err.status_code == 404 && (err.reason == 'no_db_file' || err.reason == 'Database does not exist.') ) {
+                db.db.create(collectionName, function createdDB(err) {
+                    if (err) {
+                        return cb(err);
+                    }
+
+                    adapter.registerSingleCollection(connection, collectionName, collection, cb);
+                });
+                return;
+            }
+            // console.log('unexpected ERROR', err);
             return cb(err);
-          }
+        } catch (e) {
+            return cb(e);
+        }
 
-          adapter.registerSingleCollection(connection, collectionName, collection, cb);
-        });
-        return;
-      }
-      // console.log('unexpected ERROR', err);
-      return cb(err);
-    }
-    catch (e) { return cb(e); }
-
-  });
+    });
 
 };
 
@@ -161,7 +156,7 @@ adapter.registerSingleCollection = function registerCollection(connection, colle
  * @return {[type]}      [description]
  */
 adapter.teardown = function teardown(connection, cb) {
-  process.nextTick(cb);
+    process.nextTick(cb);
 };
 
 
@@ -175,12 +170,12 @@ adapter.teardown = function teardown(connection, cb) {
  * @return {[type]}                  [description]
  */
 adapter.describe = function describe(connection, collectionName, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var collection = registry.collection(collectionName);
-  if (! collection)
-    return cb(new Error('no such collection'));
+    collectionName = sanitizeCollectionName(collectionName);
+    var collection = registry.collection(collectionName);
+    if (!collection)
+        return cb(new Error('no such collection'));
 
-  return cb(null, collection.definition);
+    return cb(null, collection.definition);
 };
 
 
@@ -196,11 +191,11 @@ adapter.describe = function describe(connection, collectionName, cb) {
  * @return {[type]}                  [description]
  */
 adapter.drop = function drop(connectionName, collectionName, relations, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var connection = registry.connection(connectionName);
-  var url = urlForConfig(connection);
-  var db = nano(url);
-  db.db.destroy(collectionName, cb);
+    collectionName = sanitizeCollectionName(collectionName);
+    var connection = registry.connection(connectionName);
+    var url = urlForConfig(connection);
+    var db = nano(url);
+    db.db.destroy(collectionName, cb);
 };
 
 
@@ -222,510 +217,550 @@ adapter.drop = function drop(connectionName, collectionName, relations, cb) {
 adapter.find = find;
 
 function find(connectionName, collectionName, criteria, cb, round) {
-  collectionName = sanitizeCollectionName(collectionName);
-  if ('number' != typeof round) round = 0;
+    collectionName = sanitizeCollectionName(collectionName);
+    if ('number' != typeof round)
+        round = 0;
 
-  // If you need to access your private data for this collection:
-  var db = registry.db(collectionName);
+    // If you need to access your private data for this collection:
+    var db = registry.db(collectionName);
 
-  //console.log('GETTING DB FOR "%s"."%s"', connectionName, collectionName);
-  // console.log('got: ',db);
-  if (!db) {
-    return cb((function buildError(){
-      var e = new Error();
-      e.name = 'Adapter Error';
-      e.type = 'adapter';
-      e.code = 'E_ADAPTER';
-      e.message = util.format('Could not acquire data access object (`db`) object for CouchDB connection "%s" for collection "%s"', connectionName, collectionName);
-      e.connectionName = connectionName;
-      e.collectionName = collectionName;
-      return e;
-    })());
-  }
-
-  // Build initial `dbOptions`
-  var dbOptions = (function (dbOptions){
-    if (criteria.limit) dbOptions.limit = criteria.limit;
-    if (criteria.skip) dbOptions.skip = criteria.skip;
-    return dbOptions;
-  })({});
-
-  var queriedAttributes = Object.keys(criteria.where || {});
-  //console.log("Queried Attributes: ",queriedAttributes);
-
-  // Handle case where no criteria is specified at all
-  // (list all documents in the couch collection)
-  if (queriedAttributes.length === 0) {
-    console.log('Queried Attributes" (aka criteria\'s WHERE clause) doesn\'t contain any values-- listing everything!');
-
-    // All docs
-    dbOptions.include_docs = true;
-    // TODO: test if limit works?
-    // TODO: test if skip works?
-    // TODO: test if sort works?
-    db.list(dbOptions, function listReplied(err, docs) {
-      if (err) {
-        return cb(err);
-      }
-
-      if (!Array.isArray(docs) && docs.rows) {
-        docs = docs.rows.map(prop('doc'));
-      }
-      else {}
-
-      // either way...
-      return cb(null, docs.map(docForReply));
-    });
-    return;
-  }
-
-
-  // Handle query for a single doc using the provided primary key criteria (e.g. `findOne()`)
-  if (queriedAttributes.length == 1 && (queriedAttributes[0] == 'id' || queriedAttributes[0] == '_id')) {
-    var id = criteria.where.id || criteria.where._id;
-
-    db.get(id, dbOptions, function(err, doc) {
-      if (err) {
-        if (err.status_code == 404) {
-          return cb(null, []);
-        }
-        return cb(err);
-      }
-      var docs = doc ? [doc] : [];
-      return cb(null, docs.map(docForReply));
-    });
-    return;
-  }
-
-  // Take a look at `criteria.where.like`...
-  asyncx_ifTruthy(criteria.where.like,
-
-    // Handle "like" modifier using a view
-    function ifSoDo(next){
-      var viewName = views.name(criteria.where.like);
-      var value = views.likeValue(criteria.where.like, true);
-      dbOptions.startkey = value.startkey;
-      dbOptions.endkey = value.endkey;
-      return db.view('views', viewName, dbOptions, next);
-    },
-
-    // Handle general-case criteria queries using a view
-    function elseDo (next){
-      var viewName = views.name(criteria.where);
-      dbOptions.key = views.value(criteria.where);
-      return db.view('views', viewName, dbOptions, next);
-    },
-
-    function finallyDo(err, reply) {
-      if (err) {
-        if (err.status_code === 404 && round < 1) {
-          views.create(db, criteria.where.like || criteria.where, function createdView(err) {
-            if (err) {
-              return cb(err);
-            }
-            find.call(connectionName, connectionName, collectionName, criteria, cb, round + 1);
-          });
-          return;
-        }
-
-        return cb(err);
-      }
-
-      return cb(null, reply.rows.map(prop('value')).map(docForReply));
+    //console.log('GETTING DB FOR "%s"."%s"', connectionName, collectionName);
+    // console.log('got: ',db);
+    if (!db) {
+        return cb((function buildError() {
+            var e = new Error();
+            e.name = 'Adapter Error';
+            e.type = 'adapter';
+            e.code = 'E_ADAPTER';
+            e.message = util.format('Could not acquire data access object (`db`) object for CouchDB connection "%s" for collection "%s"', connectionName, collectionName);
+            e.connectionName = connectionName;
+            e.collectionName = collectionName;
+            return e;
+        })());
     }
-  );
 
+    // Build initial `dbOptions`
+    var dbOptions = (function (dbOptions) {
+        if (criteria.limit)
+            dbOptions.limit = criteria.limit;
+        if (criteria.skip)
+            dbOptions.skip = criteria.skip;
+        return dbOptions;
+    })({});
+
+    var queriedAttributes = Object.keys(criteria.where || {});
+
+    // Handle case where no criteria is specified at all
+    // (list all documents in the couch collection)
+    if (queriedAttributes.length === 0) {
+        console.log('Queried Attributes" (aka criteria\'s WHERE clause) doesn\'t contain any values-- listing everything!');
+
+        // All docs
+        dbOptions.include_docs = true;
+        // TODO: test if limit works?
+        // TODO: test if skip works?
+        // TODO: test if sort works?
+        db.list(dbOptions, function listReplied(err, docs) {
+            if (err) {
+                return cb(err);
+            }
+
+            if (!Array.isArray(docs) && docs.rows) {
+                docs = docs.rows.map(prop('doc'));
+            } else {
+            }
+
+            // either way...
+            return cb(null, docs.map(docForReply));
+        });
+        return;
+    }
+
+
+    // Handle query for a single doc using the provided primary key criteria (e.g. `findOne()`)
+    if (queriedAttributes.length == 1 && (queriedAttributes[0] == 'id' || queriedAttributes[0] == '_id')) {
+        var id = criteria.where.id || criteria.where._id;
+        if (typeof id === 'string') {
+            id = [id];
+        }
+        db.fetch({keys: id}, dbOptions, function (err, result) {
+            if (err) {
+                if (err.status_code == 404) {
+                    return cb(null, []);
+                }
+                return cb(err);
+            }
+            //console.log(result);
+            return cb(null, docsForReply(result));
+        });
+        return;
+    }
+    // Take a look at `criteria.where.like`...
+    asyncx_ifTruthy(criteria.where.like,
+        // Handle "like" modifier using a view
+        function ifSoDo(next) {
+            var viewName = views.name(criteria.where.like);
+            var value = views.likeValue(criteria.where.like, true);
+            dbOptions.startkey = value.startkey;
+            dbOptions.endkey = value.endkey;
+            return db.view('views', viewName, dbOptions, next);
+        },
+        // Handle general-case criteria queries using a view
+        function elseDo(next) {
+            var viewName = views.name(criteria.where);
+            dbOptions.key = views.value(criteria.where);
+            return db.view('views', viewName, dbOptions, next);
+        },
+        function finallyDo(err, reply) {
+            if (err) {
+                if (err.status_code === 404 && round < 1) {
+                    views.create(db, criteria.where.like || criteria.where, function createdView(err) {
+                        if (err) {
+                            return cb(err);
+                        }
+                        find.call(connectionName, connectionName, collectionName, criteria, cb, round + 1);
+                    });
+                    return;
+                }
+
+                return cb(err);
+            }
+
+            return cb(null, reply.rows.map(prop('value')).map(docForReply));
+        }
+    );
 
 }
 
 
-/**
- *
- * REQUIRED method if users expect to call Model.create() or any methods
- *
- * @param  {[type]}   collectionName [description]
- * @param  {[type]}   values         [description]
- * @param  {Function} cb             [description]
- * @return {[type]}                  [description]
- */
-adapter.create = function create(connectionName, collectionName, values, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
+        /**
+         *
+         * REQUIRED method if users expect to call Model.create() or any methods
+         *
+         * @param  {[type]}   collectionName [description]
+         * @param  {[type]}   values         [description]
+         * @param  {Function} cb             [description]
+         * @return {[type]}                  [description]
+         */
+        adapter.create = function create(connectionName, collectionName, values, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
 
-  var db = registry.db(collectionName);
-  db.insert(docForIngestion(values), replied);
+            var db = registry.db(collectionName);
+            db.insert(docForIngestion(values), replied);
 
-  function replied(err, reply) {
-    if (err) cb(err);
-    else {
-      var attrs = extend({}, values, { _id: reply.id, _rev: reply.rev });
-      cb(null, docForReply(attrs));
-    }
-  }
-};
-
-
-
-/**
- *
- *
- * REQUIRED method if users expect to call Model.update()
- *
- * @param  {[type]}   collectionName [description]
- * @param  {[type]}   options        [description]
- * @param  {[type]}   values         [description]
- * @param  {Function} cb             [description]
- * @return {[type]}                  [description]
- */
-adapter.update = function update(connectionName, collectionName, options, values, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-
-  var searchAttributes = Object.keys(options.where);
-  if (searchAttributes.length != 1)
-    return cb(new Error('only support updating one object by id'));
-  if (searchAttributes[0] != 'id')
-    return cb(new Error('only support updating one object by id'));
-
-  // Find the document
-  adapter.find(connectionName, collectionName, options, function(err,docs) {
-    var doc = docs[0]; // only one document with that id
-    if(!doc) return cb('No document found to update.');
-
-    delete values.id; // deleting id from values attr
-    Object.keys(values).forEach(function(key) {
-      doc[key] = values[key];
-    });
-
-    //console.log('Document to update: ', doc);
-    var db = registry.db(collectionName);
-    db.insert(docForIngestion(doc), options.where.id, function(err, reply) {
-      if (err) cb(err);
-      else {
-        var attrs = extend({}, doc, { _id: reply.id, _rev: reply.rev });
-        cb(null, docForReply(attrs));
-      }
-    });
-  });
-};
-
-
-/**
- *
- * REQUIRED method if users expect to call Model.destroy()
- *
- * @param  {[type]}   collectionName [description]
- * @param  {[type]}   options        [description]
- * @param  {Function} cb             [description]
- * @return {[type]}                  [description]
- */
-adapter.destroy = function destroy(connectionName, collectionName, options, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var db = registry.db(collectionName);
-
-  // Find the record
-  adapter.find(connectionName,collectionName,options, function(err,docs) {
-    async.each(docs,function(item) { // Shoud have only one.
-      db.destroy(item.id, item.rev, function(err, doc) {
-        cb(err,[item]); // Waterline expects an array as result.
-      });
-    });
-  });
-};
+            function replied(err, reply) {
+                if (err)
+                    cb(err);
+                else {
+                    var attrs = extend({}, values, {_id: reply.id, _rev: reply.rev});
+                    cb(null, docForReply(attrs));
+                }
+            }
+        };
 
 
 
-/**********************************************
- * Custom methods
- **********************************************/
+        /**
+         *
+         *
+         * REQUIRED method if users expect to call Model.update()
+         *
+         * @param  {[type]}   collectionName [description]
+         * @param  {[type]}   options        [description]
+         * @param  {[type]}   values         [description]
+         * @param  {Function} cb             [description]
+         * @return {[type]}                  [description]
+         */
+        adapter.update = function update(connectionName, collectionName, options, values, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
+
+            options.where.id = values.id;
+
+            // Find the document
+            adapter.find(connectionName, collectionName, options, function (err, docs) {
+                var doc = docs[0]; // only one document with that id
+                if (!doc)
+                    return cb('No document found to update.');
+
+                delete values.id; // deleting id from values attr
+                Object.keys(values).forEach(function (key) {
+                    doc[key] = values[key];
+                });
+
+                
+                var db = registry.db(collectionName);
+                db.insert(docForIngestion(doc), options.where.id, function (err, reply) {
+                    if (err)
+                        cb(err);
+                    else {
+                        
+                        var attrs = extend({}, doc, {_id: reply.id, _rev: reply.rev});
+                        cb(null, docForReply(attrs));
+                    }
+                });
+            });
+        };
+
+
+        /**
+         *
+         * REQUIRED method if users expect to call Model.destroy()
+         *
+         * @param  {[type]}   collectionName [description]
+         * @param  {[type]}   options        [description]
+         * @param  {Function} cb             [description]
+         * @return {[type]}                  [description]
+         */
+        adapter.destroy = function destroy(connectionName, collectionName, options, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
+            var db = registry.db(collectionName);
+
+            // Find the record
+            adapter.find(connectionName, collectionName, options, function (err, docs) {
+                var todelete = []
+                for (var i = 0; i < docs.length; i++) {
+                    if (!docs[i].id)
+                        continue;
+                    todelete.push({
+                        _deleted: true,
+                        _rev: docs[i].rev,
+                        _id: docs[i].id
+                    });
+
+                }
+                db.bulk({'docs':todelete},function(error, response) {
+                    cb(err, response);
+                });
+            });
+        };
+
+
+
+        /**********************************************
+         * Custom methods
+         **********************************************/
 
 
 /// Authenticate
 
-adapter.authenticate = function authenticate(connection, collectionName, username, password, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var db = registry.db(collectionName);
+        adapter.authenticate = function authenticate(connection, collectionName, username, password, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
+            var db = registry.db(collectionName);
 
-  db.auth(username, password, replied);
+            db.auth(username, password, replied);
 
-  function replied(err, body, headers) {
-    if (err) cb(err);
-    else {
-      var sessionId;
-      var header = headers['set-cookie'][0];
-      if (header) sessionId = cookie.parse(header).AuthSession;
-      cb(null, sessionId, username, body.roles);
-    }
-  }
-};
+            function replied(err, body, headers) {
+                if (err)
+                    cb(err);
+                else {
+                    var sessionId;
+                    var header = headers['set-cookie'][0];
+                    if (header)
+                        sessionId = cookie.parse(header).AuthSession;
+                    cb(null, sessionId, username, body.roles);
+                }
+            }
+        };
 
 
 /// Session
 
-adapter.session = function session(connection, collectionName, sid, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var url = urlForConfig(registry.connection(connection));
+        adapter.session = function session(connection, collectionName, sid, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
+            var url = urlForConfig(registry.connection(connection));
 
-  var sessionDb = nano({
-    url: url,
-    cookie: 'AuthSession=' + encodeURIComponent(sid)
-  });
+            var sessionDb = nano({
+                url: url,
+                cookie: 'AuthSession=' + encodeURIComponent(sid)
+            });
 
-  sessionDb.session(cb);
-};
+            sessionDb.session(cb);
+        };
 
 
 
 /// Merge
 
-adapter.merge = function adapterMerge(connectionName, collectionName, id, attrs, cb, attempts) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var doc;
-  var db = registry.db(collectionName);
+        adapter.merge = function adapterMerge(connectionName, collectionName, id, attrs, cb, attempts) {
+            collectionName = sanitizeCollectionName(collectionName);
+            var doc;
+            var db = registry.db(collectionName);
 
-  var coll = registry.collection(collectionName);
-  /*
-  console.log('------------------------------------------');
-  console.log('Attempting merge on ',collectionName,id,attrs);
-  console.log('------------------------------------------');
-  */
+            var coll = registry.collection(collectionName);
+            /*
+             console.log('------------------------------------------');
+             console.log('Attempting merge on ',collectionName,id,attrs);
+             console.log('------------------------------------------');
+             */
 
-  if ('number' != typeof attempts) attempts = 0;
-  else if (attempts > 0) {
-    //var config = coll.adapter.config;
-    // Reference to maxMergeAttempts
-    if (attempts > 5) {
-      return cb(new Error('max attempts of merging reached'));
-    }
-  }
+            if ('number' != typeof attempts)
+                attempts = 0;
+            else if (attempts > 0) {
+                //var config = coll.adapter.config;
+                // Reference to maxMergeAttempts
+                if (attempts > 5) {
+                    return cb(new Error('max attempts of merging reached'));
+                }
+            }
 
-  db.get(id, got);
+            db.get(id, got);
 
-  function got(err, _doc) {
-    if (err && err.status_code == 404) _doc = {};
-    else if (err) return cb(err);
+            function got(err, _doc) {
+                if (err && err.status_code == 404)
+                    _doc = {};
+                else if (err)
+                    return cb(err);
 
-    delete attrs._rev;
+                delete attrs._rev;
 
-    _doc = docForReply(_doc);
+                _doc = docForReply(_doc);
 
-    doc = merge(_doc, attrs);
-    //console.log('----------Callbacks',coll._callbacks.beforeUpdate);
-    async.eachSeries(coll._callbacks.beforeUpdate || [], invokeCallback, afterBeforeUpdate);
-  }
+                doc = merge(_doc, attrs);
+                //console.log('----------Callbacks',coll._callbacks.beforeUpdate);
+                async.eachSeries(coll._callbacks.beforeUpdate || [], invokeCallback, afterBeforeUpdate);
+            }
 
-  function invokeCallback(fn, cb) {
-    //console.log("----------Calling Function ",fn);
-    fn.call(null, doc, cb);
-  }
+            function invokeCallback(fn, cb) {
+                //console.log("----------Calling Function ",fn);
+                fn.call(null, doc, cb);
+            }
 
-  function afterBeforeUpdate(err) {
-    if (err) return cb(err);
+            function afterBeforeUpdate(err) {
+                if (err)
+                    return cb(err);
 
-    var newdoc = docForIngestion(doc);
-    //console.log('----------Heres our final doc',newdoc._id,newdoc._rev);
-    console.trace();
+                var newdoc = docForIngestion(doc);
+                //console.log('----------Heres our final doc',newdoc._id,newdoc._rev);
+                console.trace();
 
-    db.insert(newdoc, id, saved);
-  }
+                db.insert(newdoc, id, saved);
+            }
 
-  function saved(err, reply) {
-    if (err && err.status_code == 409) {
-      //console.log('Calling merge again!');
-      adapter.merge(connectionName, collectionName, id, attrs, cb, attempts + 1);
-    }
-    else if (err) cb(err);
-    else {
-      extend(doc, { _rev: reply.rev, _id: reply.id });
-      doc = docForReply(doc);
-      callbackAfter();
-    }
-  }
+            function saved(err, reply) {
+                if (err && err.status_code == 409) {
+                    //console.log('Calling merge again!');
+                    adapter.merge(connectionName, collectionName, id, attrs, cb, attempts + 1);
+                } else if (err)
+                    cb(err);
+                else {
+                    extend(doc, {_rev: reply.rev, _id: reply.id});
+                    doc = docForReply(doc);
+                    callbackAfter();
+                }
+            }
 
-  function callbackAfter() {
-    async.eachSeries(coll._callbacks.afterUpdate || [], invokeCallback, finalCallback);
-  }
+            function callbackAfter() {
+                async.eachSeries(coll._callbacks.afterUpdate || [], invokeCallback, finalCallback);
+            }
 
-  function finalCallback(err) {
-    if (err) cb(err);
-    else cb(null, doc);
-  }
+            function finalCallback(err) {
+                if (err)
+                    cb(err);
+                else
+                    cb(null, doc);
+            }
 
-};
-
-  /**
-     * Join
-     *
-     * Peforms a join between 2-3 couch collections when Waterline core
-     * needs to satisfy a `.populate()`.
-     * 
-     * Adapted from sails-mongo adapter
-     * 
-     * @param  {[type]}   connectionName [description]
-     * @param  {[type]}   collectionName [description]
-     * @param  {[type]}   criteria       [description]
-     * @param  {Function} cb             [description]
-     * @return {[type]}                  [description]
-     */
-    adapter.join = function (connectionName, collectionName, criteria, cb) {
-
-      // Ignore `select` from waterline core
-      if (typeof criteria === 'object') {
-        delete criteria.select;
-      }
-
-      var collection = registry.collection(collectionName);
-
-      // Populate associated records for each parent result
-      // (or do them all at once as an optimization, if possible)
-      _runJoins({
-
-        instructions: criteria,
-        parentCollection: collectionName,
+        };
 
         /**
-         * Find some records directly (using only this adapter)
-         * from the specified collection.
+         * Join
          *
-         * @param  {String}   collectionIdentity
-         * @param  {Object}   criteria
-         * @param  {Function} cb
+         * Peforms a join between 2-3 couch collections when Waterline core
+         * needs to satisfy a `.populate()`.
+         * 
+         * Adapted from sails-mongo adapter
+         * 
+         * @param  {[type]}   connectionName [description]
+         * @param  {[type]}   collectionName [description]
+         * @param  {[type]}   criteria       [description]
+         * @param  {Function} cb             [description]
+         * @return {[type]}                  [description]
          */
-        $find: function (collectionIdentity, criteria, cb) {
-          var collection = registry.collection(collectionIdentity);
-          return collection.find(criteria, cb);
-        },
+        adapter.join = function (connectionName, collectionName, criteria, cb) {
 
-        /**
-         * Look up the name of the primary key field
-         * for the collection with the specified identity.
-         *
-         * @param  {String}   collectionIdentity
-         * @return {String}
-         */
-        $getPK: function (collectionIdentity) {
-          if (!collectionIdentity) 
-              return;
-          return "id";
-        }
-      }, cb);
+            // Ignore `select` from waterline core
+            if (typeof criteria === 'object') {
+                delete criteria.select;
+            }
 
-    },
+            var collection = registry.collection(collectionName);
 
+            // Populate associated records for each parent result
+            // (or do them all at once as an optimization, if possible)
+            _runJoins({
+                instructions: criteria,
+                parentCollection: collectionName,
+                /**
+                 * Find some records directly (using only this adapter)
+                 * from the specified collection.
+                 *
+                 * @param  {String}   collectionIdentity
+                 * @param  {Object}   criteria
+                 * @param  {Function} cb
+                 */
+                $find: function (collectionIdentity, criteria, cb) {
+                    var collection = registry.collection(collectionIdentity);
+                    return collection.find(criteria, cb);
+                },
+                /**
+                 * Look up the name of the primary key field
+                 * for the collection with the specified identity.
+                 *
+                 * @param  {String}   collectionIdentity
+                 * @return {String}
+                 */
+                $getPK: function (collectionIdentity) {
+                    return "id";
+                }
+            }, cb);
+
+        };
 /// View
 
-adapter.view = function view(connectionName, collectionName, viewName, options, cb, round) {
-  collectionName = sanitizeCollectionName(collectionName);
-  if ('number' != typeof round) round = 0;
-  var db = registry.db(collectionName);
+        adapter.view = function view(connectionName, collectionName, viewName, options, cb, round) {
+            collectionName = sanitizeCollectionName(collectionName);
+            if ('number' != typeof round)
+                round = 0;
+            var db = registry.db(collectionName);
 
-  db.view('views', viewName, options, viewResult);
+            db.view('views', viewName, options, viewResult);
 
-  function viewResult(err, results) {
-    if (err && err.status_code == 404 && round < 2)
-      populateView(connectionName, collectionName, viewName, populatedView);
-    else if (err) cb(err);
-    else cb(null, (results && results.rows && results.rows || []).map(prop('value')).map(docForReply));
-  }
+            function viewResult(err, results) {
+                if (err && err.status_code == 404 && round < 2)
+                    populateView(connectionName, collectionName, viewName, populatedView);
+                else if (err)
+                    cb(err);
+                else
+                    cb(null, (results && results.rows && results.rows || []).map(prop('value')).map(docForReply));
+            }
 
-  function populatedView(err) {
-    if (err) cb(err);
-    else adapter.view(connectionName, collectionName, viewName, options, cb, round + 1);
-  }
-};
+            function populatedView(err) {
+                if (err)
+                    cb(err);
+                else
+                    adapter.view(connectionName, collectionName, viewName, options, cb, round + 1);
+            }
+        };
 
-function populateView(connectionName, collectionName, viewName, cb) {
-  collectionName = sanitizeCollectionName(collectionName);
-  var collection = registry.collection(collectionName);
+        function populateView(connectionName, collectionName, viewName, cb) {
+            collectionName = sanitizeCollectionName(collectionName);
+            var collection = registry.collection(collectionName);
 
-  var view = collection.views && collection.views[viewName];
-  if (! view) return cb(new Error('No view named ' + viewName + ' defined in model ' + collectionName));
-  else {
-    var db = registry.db(collectionName);
-    db.get('_design/views', gotDDoc);
-  }
+            var view = collection.views && collection.views[viewName];
+            if (!view)
+                return cb(new Error('No view named ' + viewName + ' defined in model ' + collectionName));
+            else {
+                var db = registry.db(collectionName);
+                db.get('_design/views', gotDDoc);
+            }
 
-  function gotDDoc(err, ddoc) {
-    if (! ddoc) ddoc = {};
-    if (! ddoc.views) ddoc.views = {};
-    if (! ddoc._id) ddoc._id = '_design/views';
+            function gotDDoc(err, ddoc) {
+                if (!ddoc)
+                    ddoc = {};
+                if (!ddoc.views)
+                    ddoc.views = {};
+                if (!ddoc._id)
+                    ddoc._id = '_design/views';
 
-    ddoc.views[viewName] = view;
-    ddoc.language = 'javascript';
+                ddoc.views[viewName] = view;
+                ddoc.language = 'javascript';
 
-    db.insert(ddoc, insertedDDoc);
-  }
+                db.insert(ddoc, insertedDDoc);
+            }
 
-  function insertedDDoc(err) {
-    cb(err);
-  }
-}
+            function insertedDDoc(err) {
+                cb(err);
+            }
+        }
 
 
 
 /// Utils
 
 
-function urlForConfig(config) {
-  var schema = 'http';
-  if (config.https) schema += 's';
+        function urlForConfig(config) {
+            var schema = 'http';
+            if (config.https)
+                schema += 's';
 
-  var auth = '';
-  if (config.username && config.password) {
-    auth = encodeURIComponent(config.username) + ':' + encodeURIComponent(config.password) + '@';
-  }
+            var auth = '';
+            if (config.username && config.password) {
+                auth = encodeURIComponent(config.username) + ':' + encodeURIComponent(config.password) + '@';
+            }
 
-  return [schema, '://', auth, config.host, ':', config.port, '/'].join('');
-}
+            return [schema, '://', auth, config.host, ':', config.port, '/'].join('');
+        }
 
-function prop(p) {
-  return function(o) {
-    return o[p];
-  };
-}
+        function prop(p) {
+            return function (o) {
+                return o[p];
+            };
+        }
 
-function docForReply(doc) {
-  if (doc._id) {
-    doc.id = doc._id;
-    delete doc._id;
-  }
-  if (doc._rev) {
-    doc.rev = doc._rev;
-    delete doc._rev;
-  }
-
-  return doc;
-}
-
-function docForIngestion(doc) {
-  doc = extend({}, doc);
-  if (doc.id) {
-    doc._id = doc.id;
-    delete doc.id;
-  }
-  if (doc.rev) {
-    doc._rev = doc.rev;
-    delete doc.rev;
-  }
-
-  return doc;
-}
+        function docsForReply(result) {
+            var docs = [];
+            for (var i = 0; i < result.rows.length; i++) {
+                var doc = result.rows[i].doc;
+                if (!doc)
+                    continue;
+                if (doc._id) {
+                    doc.id = doc._id;
+                    delete doc._id;
+                }
+                if (doc._rev) {
+                    doc.rev = doc._rev;
+                    delete doc._rev;
+                }
+                docs.push(doc);
+            }
+            return docs;
+        }
 
 
+        function docForReply(doc) {
+            if (doc._id) {
+                doc.id = doc._id;
+                delete doc._id;
+            }
+            if (doc._rev) {
+                doc.rev = doc._rev;
+                delete doc._rev;
+            }
 
-/**
- * Branch to the appropriate fn if the provided value is truthy.
- *
- * @param  {*} valToTest
- * @param  {Function} ifSoDo(next)
- * @param  {Function} elseDo(next)
- * @param  {Function} finallyDo(err, results)
- */
-function asyncx_ifTruthy (valToTest, ifSoDo, elseDo, finallyDo){
-  return (valToTest ? ifSoDo : elseDo)(finallyDo);
-}
+            return doc;
+        }
 
-function sanitizeCollectionName (collectionName) {
-  return collectionName.replace(/([A-Z])/g, function (c) {
-    return c.toLowerCase();
-  });
+        function docForIngestion(doc) {
+            doc = extend({}, doc);
+            if (doc.id) {
+                doc._id = doc.id;
+                delete doc.id;
+            }
+            if (doc.rev) {
+                doc._rev = doc.rev;
+                delete doc.rev;
+            }
 
-}
+            return doc;
+        }
+
+
+
+        /**
+         * Branch to the appropriate fn if the provided value is truthy.
+         *
+         * @param  {*} valToTest
+         * @param  {Function} ifSoDo(next)
+         * @param  {Function} elseDo(next)
+         * @param  {Function} finallyDo(err, results)
+         */
+        function asyncx_ifTruthy(valToTest, ifSoDo, elseDo, finallyDo) {
+            return (valToTest ? ifSoDo : elseDo)(finallyDo);
+        }
+
+        function sanitizeCollectionName(collectionName) {
+            return collectionName.replace(/([A-Z])/g, function (c) {
+                return c.toLowerCase();
+            });
+
+        }
