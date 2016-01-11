@@ -18,11 +18,19 @@ function viewName(where) {
 /// Value
 
 exports.value = value;
-
 function value(options, isLike) {
-  return Object.keys(options).sort().map(function(key) {
-    return options[key];
-  });
+    var key= [];
+    var keys = Object.keys(options).sort();
+    for(var i = 0 ; i< keys.length ; i++){
+        if(typeof options[keys[i]] === "string")
+          key.push(options[keys[i]]);
+        else{
+            for(var k in options[keys[i]]){
+                key.push(options[keys[i]][k]);
+            }
+        }
+    }
+    return key;
 }
 
 exports.likeValue = likeValue;
